@@ -20,10 +20,14 @@ export interface TokenPayload {
   tid: string // tenant id
 }
 
-export async function verifyToken(token: string): Promise<TokenPayload> {
+export async function verifyToken(token: string, tenantId?: string): Promise<TokenPayload> {
   try {
+    const issuer = tenantId
+      ? [`https://sts.windows.net/${tenantId}/`, `https://login.microsoftonline.com/${tenantId}/v2.0`]
+      : ['https://sts.windows.net/common/', 'https://login.microsoftonline.com/common/v2.0'];
+
     const verified = await jwtVerify(token, JWKS, {
-      issuer: ['https://sts.windows.net/{tenantid}/', 'https://login.microsoftonline.com/{tenantid}/v2.0'],
+      issuer,
     })
     return verified.payload as TokenPayload
   } catch (error) {

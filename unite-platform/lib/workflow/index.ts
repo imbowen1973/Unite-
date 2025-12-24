@@ -63,6 +63,19 @@ export class DocumentWorkflowService {
     versionHistoryEnabled: boolean = false,
     siteCollection: string = 'unite-docs' // Default site collection
   ): Promise<DocumentMetadata> {
+    // Validate inputs
+    if (!user || !title || !content) {
+      throw new Error('Missing required parameters for document creation');
+    }
+
+    if (title.length > 255) {
+      throw new Error('Title exceeds maximum length of 255 characters');
+    }
+
+    if (description && description.length > 1000) {
+      throw new Error('Description exceeds maximum length of 1000 characters');
+    }
+
     // Check if user has write permissions
     const userPermissions = await this.accessControlService.getUserPermissions(user)
     if (!userPermissions.canWrite) {
@@ -457,6 +470,11 @@ export class DocumentWorkflowService {
 
   // Get document by docStableId
   async getDocumentByDocStableId(docStableId: string): Promise<DocumentMetadata | null> {
+    // Validate input
+    if (!docStableId) {
+      throw new Error('docStableId is required');
+    }
+
     // Get document location from DMS catalogue
     const catalogueEntry = await this.dmsService.getDocumentLocation(docStableId)
     if (!catalogueEntry) {
@@ -471,21 +489,29 @@ export class DocumentWorkflowService {
 
     // Get document permissions
     const permissions = await this.accessControlService.getDocumentPermissions(file.id)
-    
+
+    // Safely extract file extension
+    const fileNameParts = file.name.split('.');
+    const fileExtension = fileNameParts.length > 1 ? fileNameParts[fileNameParts.length - 1] : 'unknown';
+
+    // Safely extract user email
+    const userEmail = file.createdBy?.user?.email || 'unknown';
+    const lastModifiedEmail = file.lastModifiedBy?.user?.email || userEmail;
+
     return {
       id: file.id,
       docStableId: file.docStableId || docStableId,
       title: file.name,
-      description: 'Document description', // Would come from SharePoint metadata
+      description: file.description || 'Document description', // Use SharePoint description if available
       state: permissions?.state || DocumentState.Draft,
-      version: '1.0', // Would come from SharePoint version info
-      contentType: file.name.split('.').pop() || 'unknown',
-      size: file.size,
-      createdBy: file.createdBy.user.email || 'unknown',
-      createdDate: file.createdDateTime,
-      lastModifiedBy: file.lastModifiedDateTime ? file.createdBy.user.email || 'unknown' : 'unknown',
-      lastModifiedDate: file.lastModifiedDateTime || file.createdDateTime,
-      tags: [],
+      version: file.fileSystemInfo?.version || '1.0', // Use SharePoint version if available
+      contentType: fileExtension,
+      size: file.size || 0,
+      createdBy: userEmail,
+      createdDate: file.createdDateTime || new Date().toISOString(),
+      lastModifiedBy: lastModifiedEmail,
+      lastModifiedDate: file.lastModifiedDateTime || file.createdDateTime || new Date().toISOString(),
+      tags: file.tags || [],
       committees: permissions?.allowedCommittees || [],
       allowedAccessLevels: permissions?.allowedAccessLevels || [AccessLevel.Public],
       versionHistoryEnabled: permissions?.versionHistoryEnabled || false

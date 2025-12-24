@@ -72,8 +72,15 @@ export class AuditService {
     actor: string, // UPN or user ID
     payload: any,
     correlationId?: string,
-    siteCollection: string = 'dms-core' // Default to DMS site
+    siteCollection: string = 'dms-core', // Default to DMS site
+    ipAddress?: string,
+    userAgent?: string
   ): Promise<AuditEvent> {
+    // Validate inputs
+    if (!action || !actor) {
+      throw new Error('Action and actor are required for audit events');
+    }
+
     // Check if this correlation ID already exists to prevent duplicates
     if (correlationId) {
       const existingEvent = await this.getAuditEventByCorrelationId(correlationId, siteCollection)
@@ -93,14 +100,20 @@ export class AuditService {
       action,
       actor,
       timestamp: new Date().toISOString(),
-      payload,
+      payload: {
+        ...payload,
+        ipAddress,
+        userAgent,
+        userAgentParsed: this.parseUserAgent(userAgent || ''),
+        sessionId: payload.sessionId || null
+      },
       previousHash,
       siteCollection
     }
 
     // Serialize the canonical representation
     const canonicalString = this.getCanonicalString(eventWithoutHash)
-    
+
     // Compute the new hash
     const currentHash = this.computeHash(canonicalString)
 
@@ -117,6 +130,58 @@ export class AuditService {
     await this.updateAuditChainHead(currentHash)
 
     return auditEvent
+  }
+
+  // Parse user agent string to extract device and browser information
+  private parseUserAgent(userAgent: string): any {
+    if (!userAgent) return null;
+
+    const result: any = {
+      browser: 'Unknown',
+      browserVersion: 'Unknown',
+      os: 'Unknown',
+      osVersion: 'Unknown',
+      device: 'Unknown'
+    };
+
+    // Simple browser detection
+    if (userAgent.includes('Chrome')) {
+      result.browser = 'Chrome';
+      const match = userAgent.match(/Chrome\/(\d+\.\d+)/);
+      if (match) result.browserVersion = match[1];
+    } else if (userAgent.includes('Firefox')) {
+      result.browser = 'Firefox';
+      const match = userAgent.match(/Firefox\/(\d+\.\d+)/);
+      if (match) result.browserVersion = match[1];
+    } else if (userAgent.includes('Safari')) {
+      result.browser = 'Safari';
+      const match = userAgent.match(/Version\/(\d+\.\d+)/);
+      if (match) result.browserVersion = match[1];
+    }
+
+    // Simple OS detection
+    if (userAgent.includes('Windows')) {
+      result.os = 'Windows';
+      if (userAgent.includes('Windows NT 10.0')) result.osVersion = '10';
+      else if (userAgent.includes('Windows NT 6.3')) result.osVersion = '8.1';
+      else if (userAgent.includes('Windows NT 6.2')) result.osVersion = '8';
+      else if (userAgent.includes('Windows NT 6.1')) result.osVersion = '7';
+    } else if (userAgent.includes('Mac')) {
+      result.os = 'MacOS';
+      const match = userAgent.match(/Mac OS X (\d+_\d+)/);
+      if (match) result.osVersion = match[1].replace('_', '.');
+    } else if (userAgent.includes('Linux')) {
+      result.os = 'Linux';
+    }
+
+    // Device detection
+    if (/(mobile|android|iphone|ipad)/i.test(userAgent)) {
+      result.device = 'Mobile';
+    } else {
+      result.device = 'Desktop';
+    }
+
+    return result;
   }
 
   // Store the audit event in SharePoint

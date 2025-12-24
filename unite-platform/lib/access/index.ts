@@ -30,6 +30,12 @@ export interface UserPermissions {
   canPublish: boolean
   canRedact: boolean
   canRescind: boolean
+  canManagePolicies: boolean
+  canManageMeetings: boolean
+  canManageAppeals: boolean
+  canViewAuditLogs: boolean
+  canManageUsers: boolean
+  canAccessReports: boolean
 }
 
 export interface DocumentPermissions {
@@ -96,6 +102,12 @@ export class AccessControlService {
       canPublish: false,
       canRedact: false,
       canRescind: false,
+      canManagePolicies: false,
+      canManageMeetings: false,
+      canManageAppeals: false,
+      canViewAuditLogs: false,
+      canManageUsers: false,
+      canAccessReports: false,
     }
 
     // Assign permissions based on access level
@@ -107,6 +119,12 @@ export class AccessControlService {
         basePermissions.canPublish = true
         basePermissions.canRedact = true
         basePermissions.canRescind = true
+        basePermissions.canManagePolicies = true
+        basePermissions.canManageMeetings = true
+        basePermissions.canManageAppeals = true
+        basePermissions.canViewAuditLogs = true
+        basePermissions.canManageUsers = true
+        basePermissions.canAccessReports = true
         break
       case AccessLevel.Executive:
         basePermissions.canRead = true
@@ -115,6 +133,11 @@ export class AccessControlService {
         basePermissions.canPublish = true
         basePermissions.canRedact = true
         basePermissions.canRescind = false
+        basePermissions.canManagePolicies = true
+        basePermissions.canManageMeetings = true
+        basePermissions.canManageAppeals = true
+        basePermissions.canViewAuditLogs = true
+        basePermissions.canAccessReports = true
         break
       case AccessLevel.CommitteeMember:
         basePermissions.canRead = true
@@ -124,6 +147,11 @@ export class AccessControlService {
         basePermissions.canPublish = false
         basePermissions.canRedact = false
         basePermissions.canRescind = false
+        basePermissions.canManagePolicies = false
+        basePermissions.canManageMeetings = false
+        basePermissions.canManageAppeals = false
+        basePermissions.canViewAuditLogs = false
+        basePermissions.canAccessReports = false
         break
       case AccessLevel.Diplomate:
         basePermissions.canRead = true
@@ -132,6 +160,11 @@ export class AccessControlService {
         basePermissions.canPublish = false
         basePermissions.canRedact = false
         basePermissions.canRescind = false
+        basePermissions.canManagePolicies = false
+        basePermissions.canManageMeetings = false
+        basePermissions.canManageAppeals = false
+        basePermissions.canViewAuditLogs = false
+        basePermissions.canAccessReports = false
         break
       case AccessLevel.Public:
         basePermissions.canRead = false // Will be determined per document
@@ -140,6 +173,12 @@ export class AccessControlService {
         basePermissions.canPublish = false
         basePermissions.canRedact = false
         basePermissions.canRescind = false
+        basePermissions.canManagePolicies = false
+        basePermissions.canManageMeetings = false
+        basePermissions.canManageAppeals = false
+        basePermissions.canViewAuditLogs = false
+        basePermissions.canManageUsers = false
+        basePermissions.canAccessReports = false
         break
     }
 
@@ -148,28 +187,39 @@ export class AccessControlService {
 
   // Check if a user can access a specific document
   async canAccessDocument(user: TokenPayload, document: DocumentPermissions): Promise<boolean> {
+    // Validate inputs
+    if (!user || !document) {
+      return false;
+    }
+
     const userPermissions = await this.getUserPermissions(user)
-    
+
     // Public access check
     if (userPermissions.accessLevel === AccessLevel.Public) {
       return document.allowedAccessLevels.includes(AccessLevel.Public)
     }
-    
+
     // Check if user's access level is allowed
     if (document.allowedAccessLevels.includes(userPermissions.accessLevel)) {
+      // For committee members, ensure they're in the right committee
+      if (userPermissions.accessLevel === AccessLevel.CommitteeMember) {
+        return document.allowedCommittees.some(committee =>
+          userPermissions.committees.includes(committee)
+        );
+      }
       return true
     }
-    
+
     // Check if user is in allowed committees
     if (document.allowedCommittees.some(committee => userPermissions.committees.includes(committee))) {
       return true
     }
-    
+
     // Check if user is specifically allowed
     if (document.allowedUsers.includes(user.oid)) {
       return true
     }
-    
+
     return false
   }
 

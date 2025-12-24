@@ -7,105 +7,7 @@ import { DocumentWorkflowService } from '@/lib/workflow'
 import { DMSService } from '@/lib/dms'
 import { AIProcessingService, MeetingSummary } from '@/lib/ai'
 import { PlannerIntegrationService, PlannerTask } from '@/lib/planner'
-
-export interface Meeting {
-  id: string
-  docStableId: string // For permanent reference
-  title: string
-  committee: string
-  scheduledDate: string
-  status: 'draft' | 'published' | 'in-progress' | 'completed' | 'cancelled'
-  organizer: string
-  attendees: string[]
-  createdAt: string
-  updatedAt: string
-  permissions: {
-    canViewBeforePublish: string[] // User IDs or group IDs
-    canEdit: string[]
-    canApprove: string[]
-    canPublish: string[]
-  }
-}
-
-export interface AgendaItem {
-  id: string
-  meetingId: string
-  title: string
-  description: string
-  itemOrder: number // Position in the agenda
-  documentId?: string
-  docStableId?: string
-  presenter?: string
-  timeAllocation: number // in minutes
-  status: 'pending' | 'in-progress' | 'discussed' | 'deferred' | 'completed'
-  supportingDocuments: string[] // docStableIds of supporting documents
-  voteRequired: 'none' | 'approval' | 'opinion'
-  voteType?: 'simple-majority' | 'super-majority' | 'unanimous'
-  discussionOutcome?: string
-  createdAt: string
-  updatedAt: string
-}
-
-export interface MeetingAction {
-  id: string
-  meetingId: string
-  agendaItemId: string
-  title: string
-  description: string
-  assignedTo: string[]
-  dueDate: string
-  status: 'open' | 'in-progress' | 'completed' | 'cancelled'
-  completionCriteria?: string
-  createdAt: string
-  completedAt?: string
-  createdBy: string
-  plannerTaskId?: string // Link to Microsoft Planner task
-}
-
-export interface MeetingVote {
-  id: string
-  meetingId: string
-  agendaItemId: string
-  voteType: 'approval' | 'opinion'
-  title: string
-  description: string
-  options: string[] // Options for the vote
-  status: 'pending' | 'in-progress' | 'completed'
-  requiredVotingPower: 'simple-majority' | 'super-majority' | 'unanimous'
-  createdAt: string
-  completedAt?: string
-  createdBy: string
-}
-
-export interface VoteRecord {
-  id: string
-  voteId: string
-  voter: string // User ID
-  voteOption: string // Selected option
-  votingPower: number // Weight of vote (for delegates)
-  isPublic: boolean // Whether individual votes are public
-  recordedAt: string
-}
-
-export interface MeetingPack {
-  id: string
-  meetingId: string
-  title: string
-  documents: string[] // docStableIds
-  createdAt: string
-  approvedBy?: string
-  approvedAt?: string
-  status: 'draft' | 'pending-approval' | 'approved' | 'published'
-}
-
-export interface VotingPattern {
-  id: string
-  meetingId: string
-  voter: string // User ID
-  voteRecordId: string
-  decision: string // The actual vote choice
-  timestamp: string
-}
+import { Meeting, AgendaItem, MeetingAction, MeetingVote, VoteRecord, MeetingPack, VotingPattern } from '@/types/meeting'
 
 export class MeetingManagementService {
   private sharepointService: SharePointService
@@ -222,6 +124,7 @@ export class MeetingManagementService {
     title: string,
     description: string,
     itemOrder: number,
+    role: 'information' | 'action' | 'decision' | 'voting' | 'discussion',
     presenter?: string,
     timeAllocation: number = 30,
     supportingDocuments: string[] = [], // docStableIds
@@ -245,7 +148,7 @@ export class MeetingManagementService {
       if (!doc) {
         throw new Error('Supporting document with docStableId ' + docStableId + ' not found')
       }
-      
+
       const canAccess = await this.accessControlService.canAccessDocument(
         user,
         {
@@ -260,7 +163,7 @@ export class MeetingManagementService {
           updatedAt: doc.lastModifiedDate
         }
       )
-      
+
       if (!canAccess) {
         throw new Error('User does not have access to supporting document ' + docStableId)
       }
@@ -279,6 +182,7 @@ export class MeetingManagementService {
       supportingDocuments,
       voteRequired,
       voteType,
+      role,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }
@@ -296,6 +200,7 @@ export class MeetingManagementService {
       SupportingDocuments: supportingDocuments.join(','),
       VoteRequired: voteRequired,
       VoteType: voteType,
+      Role: role,
       CreatedAt: agendaItem.createdAt,
       UpdatedAt: agendaItem.updatedAt
     })
@@ -717,6 +622,7 @@ export class MeetingManagementService {
       supportingDocuments: agendaItem.fields.SupportingDocuments.split(','),
       voteRequired: agendaItem.fields.VoteRequired as 'none' | 'approval' | 'opinion',
       voteType: agendaItem.fields.VoteType as 'simple-majority' | 'super-majority' | 'unanimous',
+      role: agendaItem.fields.Role as 'information' | 'action' | 'decision' | 'voting' | 'discussion',
       discussionOutcome: agendaItem.fields.DiscussionOutcome,
       createdAt: agendaItem.fields.CreatedAt,
       updatedAt: agendaItem.fields.UpdatedAt
@@ -1003,7 +909,7 @@ export class MeetingManagementService {
   async getAgendaItemsForMeeting(meetingId: string): Promise<AgendaItem[]> {
     const agendaItemsList = await this.sharepointService.getListItems('agendaItemsListId')
     const meetingItems: AgendaItem[] = []
-    
+
     for (const item of agendaItemsList) {
       if (item.fields.MeetingId === meetingId) {
         meetingItems.push({
@@ -1018,13 +924,14 @@ export class MeetingManagementService {
           supportingDocuments: item.fields.SupportingDocuments ? item.fields.SupportingDocuments.split(',') : [],
           voteRequired: item.fields.VoteRequired as 'none' | 'approval' | 'opinion',
           voteType: item.fields.VoteType as 'simple-majority' | 'super-majority' | 'unanimous',
+          role: item.fields.Role as 'information' | 'action' | 'decision' | 'voting' | 'discussion',
           discussionOutcome: item.fields.DiscussionOutcome,
           createdAt: item.fields.CreatedAt,
           updatedAt: item.fields.UpdatedAt
         })
       }
     }
-    
+
     // Sort by item order
     return meetingItems.sort((a, b) => a.itemOrder - b.itemOrder)
   }

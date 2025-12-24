@@ -1,36 +1,49 @@
-import { Metadata } from 'next'
+'use client';
 
-export const metadata: Metadata = {
-  title: 'Dashboard | Unite',
-}
+import React from 'react';
+import TodayWidget from '../dashboard/TodayWidget';
+import UpcomingMeetingsWidget from '../dashboard/UpcomingMeetingsWidget';
+import UserActionsWidget from '../dashboard/UserActionsWidget';
+import PlannerTasksWidget from '../dashboard/PlannerTasksWidget';
+import DocumentSearchWidget from '../dashboard/DocumentSearchWidget';
 
-export default function HomePage() {
+const DashboardPage = () => {
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Welcome to Unite Governance Platform</h1>
-            <p className="text-gray-600 mb-6">
-              A headless governance platform ensuring compliance with ISO 27001 standards.
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="border rounded-lg p-6 shadow-sm">
-                <h2 className="text-lg font-medium text-gray-900 mb-2">Document Management</h2>
-                <p className="text-gray-600">Controlled document workflows with audit trail</p>
-              </div>
-              <div className="border rounded-lg p-6 shadow-sm">
-                <h2 className="text-lg font-medium text-gray-900 mb-2">Meeting Engine</h2>
-                <p className="text-gray-600">Agenda builder and board pack generation</p>
-              </div>
-              <div className="border rounded-lg p-6 shadow-sm">
-                <h2 className="text-lg font-medium text-gray-900 mb-2">Appeals Workspace</h2>
-                <p className="text-gray-600">Secure, isolated case management</p>
-              </div>
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+          <p className="mt-2 text-gray-600">Welcome to your personalized Unite Platform dashboard</p>
+        </div>
+
+        {/* Dashboard Layout: 3 columns on desktop, 1 column on mobile */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Left Column (75% width on desktop) */}
+          <div className="lg:col-span-3 space-y-6">
+            <div className="bg-white shadow rounded-lg p-6">
+              <DocumentSearchWidget />
+            </div>
+          </div>
+
+          {/* Right Column (25% width on desktop) */}
+          <div className="lg:col-span-1 space-y-6">
+            <div className="bg-white shadow rounded-lg p-6">
+              <TodayWidget />
+            </div>
+            <div className="bg-white shadow rounded-lg p-6">
+              <UpcomingMeetingsWidget />
+            </div>
+            <div className="bg-white shadow rounded-lg p-6">
+              <UserActionsWidget />
+            </div>
+            <div className="bg-white shadow rounded-lg p-6">
+              <PlannerTasksWidget />
             </div>
           </div>
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
+
+export default DashboardPage;

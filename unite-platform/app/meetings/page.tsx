@@ -24,18 +24,18 @@ export default function MeetingManagementPage() {
                 </ul>
               </div>
               <div className="border rounded-lg p-6 shadow-sm">
-                <h2 className="text-lg font-medium text-gray-900 mb-2">Integration Capabilities</h2>
+                <h2 className="text-lg font-medium text-gray-900 mb-2">Role-Based Agenda Management</h2>
                 <ul className="list-disc pl-5 space-y-2 text-gray-600">
-                  <li>Microsoft 365 integration (Word, PowerPoint, Teams)</li>
-                  <li>Microsoft Planner for task assignment</li>
-                  <li>AI summarization of meeting transcripts</li>
-                  <li>Document management with SharePoint</li>
-                  <li>Comprehensive audit trail for all actions</li>
-                  <li>Role-based access control</li>
+                  <li>Agenda items categorized by role: information, action, decision, voting, discussion</li>
+                  <li>Visual indicators for each role type</li>
+                  <li>Filter and sort agenda items by role</li>
+                  <li>Easy role assignment and modification</li>
+                  <li>Enhanced meeting organization and tracking</li>
+                  <li>Improved meeting efficiency and outcomes</li>
                 </ul>
               </div>
             </div>
-            
+
             <div className="mt-8 border rounded-lg p-6 shadow-sm">
               <h2 className="text-lg font-medium text-gray-900 mb-4">Meeting Workflow</h2>
               <div className="flex flex-wrap items-center justify-center gap-4 text-sm">
@@ -72,6 +72,42 @@ export default function MeetingManagementPage() {
                 </div>
               </div>
               <p className="mt-4 text-gray-600 text-center">Each step in the workflow is audited with tamper-evident hash-chain integrity</p>
+            </div>
+
+            <div className="mt-8 border rounded-lg p-6 shadow-sm">
+              <h2 className="text-lg font-medium text-gray-900 mb-4">Role-Based Agenda Items</h2>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="text-center p-4">
+                  <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 mb-2">
+                    Information
+                  </div>
+                  <p className="text-sm text-gray-600">For sharing information without requiring action</p>
+                </div>
+                <div className="text-center p-4">
+                  <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 mb-2">
+                    Action
+                  </div>
+                  <p className="text-sm text-gray-600">Requires specific action items to be completed</p>
+                </div>
+                <div className="text-center p-4">
+                  <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800 mb-2">
+                    Decision
+                  </div>
+                  <p className="text-sm text-gray-600">Requires a decision to be made</p>
+                </div>
+                <div className="text-center p-4">
+                  <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800 mb-2">
+                    Voting
+                  </div>
+                  <p className="text-sm text-gray-600">Requires a formal vote</p>
+                </div>
+                <div className="text-center p-4">
+                  <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 mb-2">
+                    Discussion
+                  </div>
+                  <p className="text-sm text-gray-600">Open discussion topic</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

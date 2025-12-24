@@ -1,6 +1,7 @@
 // AuditService with Hash-Chain Logic for Unite Platform DMS Site
-import { createHash } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
 import { SharePointService } from '@/lib/sharepoint'
+import { kv } from '@vercel/kv'
 
 interface AuditEvent {
   id: string
@@ -66,7 +67,7 @@ export class AuditService {
     }
   }
 
-  // Create a new audit event with hash chaining
+  // Create a new audit event with hash chaining (with race condition protection)
   async createAuditEvent(
     action: string,
     actor: string, // UPN or user ID
@@ -90,46 +91,86 @@ export class AuditService {
       }
     }
 
-    // Get the current head hash
-    const previousHash = await this.getCurrentHeadHash()
+    // Implement optimistic locking using Vercel KV to prevent race conditions
+    const lockKey = `audit_chain_lock:${siteCollection}`
+    const maxRetries = 5
+    let retries = 0
 
-    // Create the event object without the current hash yet
-    const eventWithoutHash: Omit<AuditEvent, 'currentHash'> = {
-      id: this.generateId(),
-      correlationId: correlationId || this.generateId(),
-      action,
-      actor,
-      timestamp: new Date().toISOString(),
-      payload: {
-        ...payload,
-        ipAddress,
-        userAgent,
-        userAgentParsed: this.parseUserAgent(userAgent || ''),
-        sessionId: payload.sessionId || null
-      },
-      previousHash,
-      siteCollection
+    while (retries < maxRetries) {
+      try {
+        // Try to acquire lock with 10 second TTL
+        const lockId = randomUUID()
+        const lockAcquired = await kv.set(lockKey, lockId, {
+          ex: 10,
+          nx: true, // Only set if not exists
+        })
+
+        if (!lockAcquired) {
+          // Lock is held by another process, wait and retry
+          await new Promise(resolve => setTimeout(resolve, 100 * Math.pow(2, retries))) // Exponential backoff
+          retries++
+          continue
+        }
+
+        try {
+          // Lock acquired, proceed with audit event creation
+          // Get the current head hash
+          const previousHash = await this.getCurrentHeadHash()
+
+          // Create the event object without the current hash yet
+          const eventWithoutHash: Omit<AuditEvent, 'currentHash'> = {
+            id: randomUUID(), // Use crypto.randomUUID() instead of weak random
+            correlationId: correlationId || randomUUID(),
+            action,
+            actor,
+            timestamp: new Date().toISOString(),
+            payload: {
+              ...payload,
+              ipAddress,
+              userAgent,
+              userAgentParsed: this.parseUserAgent(userAgent || ''),
+              sessionId: payload.sessionId || null
+            },
+            previousHash,
+            siteCollection
+          }
+
+          // Serialize the canonical representation
+          const canonicalString = this.getCanonicalString(eventWithoutHash)
+
+          // Compute the new hash
+          const currentHash = this.computeHash(canonicalString)
+
+          // Create the complete audit event
+          const auditEvent: AuditEvent = {
+            ...eventWithoutHash,
+            currentHash
+          }
+
+          // Store the audit event in SharePoint (in the DMS site)
+          await this.storeAuditEvent(auditEvent)
+
+          // Update the audit chain head with the new hash
+          await this.updateAuditChainHead(currentHash)
+
+          return auditEvent
+        } finally {
+          // Always release the lock
+          const currentLock = await kv.get(lockKey)
+          if (currentLock === lockId) {
+            await kv.del(lockKey)
+          }
+        }
+      } catch (error) {
+        console.error('Error creating audit event:', error)
+        retries++
+        if (retries >= maxRetries) {
+          throw new Error('Failed to create audit event after maximum retries')
+        }
+      }
     }
 
-    // Serialize the canonical representation
-    const canonicalString = this.getCanonicalString(eventWithoutHash)
-
-    // Compute the new hash
-    const currentHash = this.computeHash(canonicalString)
-
-    // Create the complete audit event
-    const auditEvent: AuditEvent = {
-      ...eventWithoutHash,
-      currentHash
-    }
-
-    // Store the audit event in SharePoint (in the DMS site)
-    await this.storeAuditEvent(auditEvent)
-
-    // Update the audit chain head with the new hash
-    await this.updateAuditChainHead(currentHash)
-
-    return auditEvent
+    throw new Error('Failed to acquire lock for audit chain update')
   }
 
   // Parse user agent string to extract device and browser information
@@ -315,8 +356,4 @@ export class AuditService {
     } as AuditEvent))
   }
 
-  // Generate a unique ID for audit events
-  private generateId(): string {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2, 5)
-  }
 }

@@ -2,6 +2,8 @@
 import { SharePointService } from '@/lib/sharepoint'
 import { AuditService } from '@/lib/audit'
 import { DocumentMetadata } from '@/lib/workflow'
+import { kv } from '@vercel/kv'
+import { randomUUID } from 'crypto'
 
 export interface DocumentCatalogueEntry {
   docStableId: string
@@ -108,50 +110,90 @@ export class DMSService {
     return null
   }
 
-  // Update document state in the catalogue
+  // Update document state in the catalogue (with race condition protection)
   async updateDocumentState(docStableId: string, newState: string, userUpn: string): Promise<DocumentCatalogueEntry | null> {
-    const catalogueEntry = await this.getDocumentLocation(docStableId)
-    if (!catalogueEntry) {
-      return null
-    }
+    // Implement optimistic locking to prevent race conditions
+    const lockKey = `dms_update_lock:${docStableId}`
+    const maxRetries = 5
+    let retries = 0
 
-    // Update the catalogue entry
-    catalogueEntry.state = newState
-    catalogueEntry.updatedAt = new Date().toISOString()
-    
-    // Find the item in SharePoint and update it
-    const catalogueItems = await this.sharepointService.getListItems('DocumentCatalogueListId')
-    let itemIdToUpdate: string | null = null
-    
-    for (const item of catalogueItems) {
-      if (item.fields.DocStableId === docStableId) {
-        itemIdToUpdate = item.id
-        break
+    while (retries < maxRetries) {
+      try {
+        // Try to acquire lock with 10 second TTL
+        const lockId = randomUUID()
+        const lockAcquired = await kv.set(lockKey, lockId, {
+          ex: 10,
+          nx: true, // Only set if not exists
+        })
+
+        if (!lockAcquired) {
+          // Lock is held by another process, wait and retry
+          await new Promise(resolve => setTimeout(resolve, 100 * Math.pow(2, retries)))
+          retries++
+          continue
+        }
+
+        try {
+          // Lock acquired, proceed with state update
+          const catalogueEntry = await this.getDocumentLocation(docStableId)
+          if (!catalogueEntry) {
+            return null
+          }
+
+          // Update the catalogue entry
+          catalogueEntry.state = newState
+          catalogueEntry.updatedAt = new Date().toISOString()
+
+          // Find the item in SharePoint and update it
+          const catalogueItems = await this.sharepointService.getListItems('DocumentCatalogueListId')
+          let itemIdToUpdate: string | null = null
+
+          for (const item of catalogueItems) {
+            if (item.fields.DocStableId === docStableId) {
+              itemIdToUpdate = item.id
+              break
+            }
+          }
+
+          if (itemIdToUpdate) {
+            await this.sharepointService.updateListItem('DocumentCatalogueListId', itemIdToUpdate, {
+              State: newState,
+              UpdatedAt: catalogueEntry.updatedAt
+            })
+          }
+
+          // Log the state change
+          await this.auditService.createAuditEvent(
+            'document.state.updated',
+            userUpn,
+            {
+              docStableId,
+              previousState: catalogueEntry.state,
+              newState,
+              updatedBy: userUpn
+            },
+            'update_state_' + docStableId,
+            'dms-core'
+          )
+
+          return catalogueEntry
+        } finally {
+          // Always release the lock
+          const currentLock = await kv.get(lockKey)
+          if (currentLock === lockId) {
+            await kv.del(lockKey)
+          }
+        }
+      } catch (error) {
+        console.error('Error updating document state:', error)
+        retries++
+        if (retries >= maxRetries) {
+          throw new Error('Failed to update document state after maximum retries')
+        }
       }
     }
-    
-    if (itemIdToUpdate) {
-      await this.sharepointService.updateListItem('DocumentCatalogueListId', itemIdToUpdate, {
-        State: newState,
-        UpdatedAt: catalogueEntry.updatedAt
-      })
-    }
 
-    // Log the state change
-    await this.auditService.createAuditEvent(
-      'document.state.updated',
-      userUpn,
-      {
-        docStableId,
-        previousState: catalogueEntry.state,
-        newState,
-        updatedBy: userUpn
-      },
-      'update_state_' + docStableId,
-      'dms-core'
-    )
-
-    return catalogueEntry
+    throw new Error('Failed to acquire lock for document state update')
   }
 
   // Create a new site library for specific purposes (e.g., appeals)

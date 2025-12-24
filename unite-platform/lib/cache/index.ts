@@ -61,10 +61,13 @@ export class CacheService {
   // Increment a counter in cache
   async increment(key: string, value: number = 1, ttl: number = this.defaultTtl): Promise<number> {
     try {
-      const result = await kv.incrby(key, value)
-      // Set TTL if it's not already set
-      await kv.expire(key, ttl)
-      return result as number
+      // Use pipeline to ensure atomic operation
+      const pipeline = kv.pipeline()
+      pipeline.incrby(key, value)
+      pipeline.expire(key, ttl)
+      const results = await pipeline.exec()
+      // Return the increment result (first operation)
+      return results[0] as number
     } catch (error) {
       console.error('Cache increment error:', error)
       throw error
@@ -74,10 +77,13 @@ export class CacheService {
   // Decrement a counter in cache
   async decrement(key: string, value: number = 1, ttl: number = this.defaultTtl): Promise<number> {
     try {
-      const result = await kv.decrby(key, value)
-      // Set TTL if it's not already set
-      await kv.expire(key, ttl)
-      return result as number
+      // Use pipeline to ensure atomic operation
+      const pipeline = kv.pipeline()
+      pipeline.decrby(key, value)
+      pipeline.expire(key, ttl)
+      const results = await pipeline.exec()
+      // Return the decrement result (first operation)
+      return results[0] as number
     } catch (error) {
       console.error('Cache decrement error:', error)
       throw error
@@ -113,24 +119,28 @@ export class CacheService {
 // Specific caching utilities for Unite Platform
 export class UniteCacheService extends CacheService {
   // Cache for dashboard counters to avoid SharePoint throttling
-  async getDashboardCount(key: string): Promise<number> {
-    const cached = await this.get<number>('dashboard:' + key)
+  async getDashboardCount(key: string, userId: string): Promise<number> {
+    // Include user ID to prevent cache poisoning
+    const cached = await this.get<number>(`dashboard:${userId}:${key}`)
     return cached || 0
   }
 
-  async setDashboardCount(key: string, value: number): Promise<void> {
-    await this.set('dashboard:' + key, value, 300) // 5 minutes TTL for dashboard counts
+  async setDashboardCount(key: string, userId: string, value: number): Promise<void> {
+    // Include user ID to prevent cache poisoning
+    await this.set(`dashboard:${userId}:${key}`, value, 300) // 5 minutes TTL for dashboard counts
   }
 
-  async incrementDashboardCount(key: string): Promise<number> {
-    return await this.increment('dashboard:' + key, 1, 300) // 5 minutes TTL
+  async incrementDashboardCount(key: string, userId: string): Promise<number> {
+    // Include user ID to prevent cache poisoning
+    return await this.increment(`dashboard:${userId}:${key}`, 1, 300) // 5 minutes TTL
   }
 
-  async decrementDashboardCount(key: string): Promise<number> {
-    return await this.decrement('dashboard:' + key, 1, 300) // 5 minutes TTL
+  async decrementDashboardCount(key: string, userId: string): Promise<number> {
+    // Include user ID to prevent cache poisoning
+    return await this.decrement(`dashboard:${userId}:${key}`, 1, 300) // 5 minutes TTL
   }
 
-  // Cache for document lookups by docStableId
+  // Cache for document lookups by docStableId (global, not user-specific)
   async getDocStableIdCache(docStableId: string): Promise<string | null> {
     return await this.get<string>('doc:' + docStableId)
   }
@@ -140,16 +150,20 @@ export class UniteCacheService extends CacheService {
   }
 
   // Cache for user permissions
-  async getUserPermissionsCache(userId: string): Promise<string[]> {
-    const cached = await this.get<string[]>('permissions:' + userId)
+  async getUserPermissionsCache(userId: string, tenantId?: string): Promise<string[]> {
+    // Include tenant ID for multi-tenant scenarios
+    const cacheKey = tenantId ? `permissions:${tenantId}:${userId}` : `permissions:${userId}`
+    const cached = await this.get<string[]>(cacheKey)
     return cached || []
   }
 
-  async setUserPermissionsCache(userId: string, permissions: string[]): Promise<void> {
-    await this.set('permissions:' + userId, permissions, 900) // 15 minutes TTL
+  async setUserPermissionsCache(userId: string, permissions: string[], tenantId?: string): Promise<void> {
+    // Include tenant ID for multi-tenant scenarios
+    const cacheKey = tenantId ? `permissions:${tenantId}:${userId}` : `permissions:${userId}`
+    await this.set(cacheKey, permissions, 900) // 15 minutes TTL
   }
 
-  // Cache for audit verification results
+  // Cache for audit verification results (system-wide, not user-specific)
   async getAuditVerificationCache(key: string): Promise<boolean | null> {
     return await this.get<boolean>('audit-verify:' + key)
   }

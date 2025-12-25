@@ -39,6 +39,7 @@ interface SharePointListItem {
 export class SharePointService {
   private config: SharePointConfig
   private accessToken: string | null = null
+  private tokenExpiry: number | null = null
 
   constructor(config: SharePointConfig) {
     this.config = config
@@ -47,7 +48,7 @@ export class SharePointService {
   // Get access token for service account using client credentials flow
   async getServiceAccountToken(): Promise<string> {
     const tokenUrl = 'https://login.microsoftonline.com/' + this.config.tenantUrl + '/oauth2/v2.0/token'
-    
+
     const response = await fetch(tokenUrl, {
       method: 'POST',
       headers: {
@@ -60,24 +61,25 @@ export class SharePointService {
         scope: 'https://graph.microsoft.com/.default', // Graph API scope
       }).toString(),
     })
-    
+
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error('Failed to get access token: ' + error.error_description)
+      console.error('Token acquisition failed:', response.status)
+      throw new Error('Failed to acquire access token')
     }
-    
+
     const data = await response.json()
     this.accessToken = data.access_token
+    // Store expiry time (expires_in is in seconds, subtract 5 minutes for safety margin)
+    this.tokenExpiry = Date.now() + ((data.expires_in - 300) * 1000)
     return data.access_token
   }
 
   // Ensure we have a valid access token
   private async ensureAccessToken(): Promise<string> {
-    if (!this.accessToken) {
+    // Check if token exists and is not expired
+    if (!this.accessToken || !this.tokenExpiry || Date.now() >= this.tokenExpiry) {
       return this.getServiceAccountToken()
     }
-    // In a real implementation, we would check if the token is expired
-    // For now, we'll just return the existing token
     return this.accessToken
   }
 
@@ -162,24 +164,25 @@ export class SharePointService {
   // Get file by docStableId (our custom property)
   async getFileByDocStableId(docStableId: string): Promise<SharePointFile | null> {
     const token = await this.ensureAccessToken()
-    
-    // Search for files with the specific docStableId property
-    const searchUrl = 'https://graph.microsoft.com/v1.0/sites/' + this.config.siteId + '/drive/root/search(q=\'' + docStableId + '\')'
-    
+
+    // Encode the search query to prevent OData injection
+    const encodedQuery = encodeURIComponent(docStableId)
+    const searchUrl = `https://graph.microsoft.com/v1.0/sites/${this.config.siteId}/drive/root/search(q='${encodedQuery}')`
+
     const response = await fetch(searchUrl, {
       method: 'GET',
       headers: {
         'Authorization': 'Bearer ' + token,
       },
     })
-    
+
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error('Failed to search for file: ' + JSON.stringify(error))
+      console.error('File search failed:', response.status)
+      throw new Error('Failed to search for file')
     }
-    
+
     const searchData = await response.json()
-    
+
     // Look for the file with matching docStableId in the results
     if (searchData.value && Array.isArray(searchData.value)) {
       for (const item of searchData.value) {
@@ -188,7 +191,7 @@ export class SharePointService {
         }
       }
     }
-    
+
     return null
   }
 
@@ -295,21 +298,21 @@ export class SharePointService {
   // Get items from a SharePoint list
   async getListItems(listId: string, top: number = 100): Promise<SharePointListItem[]> {
     const token = await this.ensureAccessToken()
-    
-    const itemsUrl = 'https://graph.microsoft.com/v1.0/sites/' + this.config.siteId + '/lists/' + listId + '/items?=' + top
-    
+
+    const itemsUrl = `https://graph.microsoft.com/v1.0/sites/${this.config.siteId}/lists/${listId}/items?$top=${top}&$expand=fields`
+
     const response = await fetch(itemsUrl, {
       method: 'GET',
       headers: {
         'Authorization': 'Bearer ' + token,
       },
     })
-    
+
     if (!response.ok) {
-      const error = await response.json()
-      throw new Error('Failed to get list items: ' + JSON.stringify(error))
+      console.error('Failed to get list items:', response.status)
+      throw new Error('Failed to retrieve list items')
     }
-    
+
     const data = await response.json()
     return data.value as SharePointListItem[]
   }

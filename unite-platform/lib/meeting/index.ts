@@ -8,6 +8,7 @@ import { DMSService } from '@/lib/dms'
 import { AIProcessingService, MeetingSummary } from '@/lib/ai'
 import { PlannerIntegrationService, PlannerTask } from '@/lib/planner'
 import { Meeting, AgendaItem, MeetingAction, MeetingVote, VoteRecord, MeetingPack, VotingPattern } from '@/types/meeting'
+import { randomUUID } from 'crypto'
 
 export class MeetingManagementService {
   private sharepointService: SharePointService
@@ -1103,16 +1104,15 @@ export class MeetingManagementService {
     })
   }
 
-  // Generate a unique ID
+  // Generate a unique ID using cryptographically secure random
   private generateId(): string {
-    return Date.now().toString(36) + Math.random().toString(36).substr(2, 5)
+    return randomUUID()
   }
 
-  // Generate a docStableId for permanent reference
+  // Generate a docStableId for permanent reference using secure random
   private generateDocStableId(): string {
     const prefix = 'MTG'
-    const suffix = Date.now().toString(36).toUpperCase()
-    const randomPart = Math.random().toString(36).substring(2, 8).toUpperCase()
-    return prefix + '-' + suffix + '-' + randomPart
+    const uuid = randomUUID().replace(/-/g, '').substring(0, 16).toUpperCase()
+    return `${prefix}-${uuid}`
   }
 }

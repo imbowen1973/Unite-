@@ -7,6 +7,13 @@ import { AccessControlService } from '@/lib/access'
 import { DocumentWorkflowService } from '@/lib/workflow'
 import { DMSService } from '@/lib/dms'
 import { MeetingManagementService } from '@/lib/meeting'
+import {
+  validateTitle,
+  validateDescription,
+  validateAction,
+  validateStringArray,
+  ValidationError
+} from '@/lib/validation/input'
 
 // Initialize services
 const sharepointService = new SharePointService({
@@ -161,7 +168,14 @@ export async function POST(request: NextRequest) {
     }
   } catch (error: any) {
     console.error('Meetings API error:', error)
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
+
+    // Return user-friendly error for validation errors
+    if (error instanceof ValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+
+    // Don't leak implementation details for other errors
+    return NextResponse.json({ error: 'Request processing failed' }, { status: 500 })
   }
 }
 
@@ -223,6 +237,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(result)
   } catch (error: any) {
     console.error('Meetings API GET error:', error)
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
+
+    // Return user-friendly error for validation errors
+    if (error instanceof ValidationError) {
+      return NextResponse.json({ error: error.message }, { status: 400 })
+    }
+
+    // Don't leak implementation details for other errors
+    return NextResponse.json({ error: 'Request processing failed' }, { status: 500 })
   }
 }

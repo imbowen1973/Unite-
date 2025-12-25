@@ -26,8 +26,14 @@ export async function verifyToken(token: string, tenantId?: string): Promise<Tok
       ? [`https://sts.windows.net/${tenantId}/`, `https://login.microsoftonline.com/${tenantId}/v2.0`]
       : ['https://sts.windows.net/common/', 'https://login.microsoftonline.com/common/v2.0'];
 
+    const clientId = process.env.MICROSOFT_CLIENT_ID;
+    if (!clientId) {
+      throw new Error('MICROSOFT_CLIENT_ID environment variable is not set');
+    }
+
     const verified = await jwtVerify(token, JWKS, {
       issuer,
+      audience: clientId, // Validate audience to prevent token reuse from other apps
     })
     return verified.payload as TokenPayload
   } catch (error) {

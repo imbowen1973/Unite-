@@ -128,3 +128,155 @@ export interface AgendaReorderOperation {
   newItemOrder: number
   affectedChildrenIds: string[] // Children that move with parent
 }
+
+// Meeting Minutes
+export interface MinuteItem {
+  id: string
+  meetingId: string
+  agendaItemId: string // Links to corresponding agenda item
+
+  // Content from agenda item (copied for reference)
+  agendaTitle: string
+  agendaPurpose: string
+  orderPath: string // Matches agenda item orderPath for sorting
+  level: number // Matches agenda item level
+
+  // Discussion content
+  discussion: string // Main discussion text (extracted from transcript or manual)
+  discussionSummary?: string // AI-generated summary
+  keyPoints?: string[] // Bullet points of key discussion
+
+  // Decisions and outcomes
+  decision?: string // Final decision or outcome
+  votingResult?: {
+    voteId: string
+    outcome: string
+    votesFor: number
+    votesAgainst: number
+    abstentions: number
+  }
+
+  // Actions arising from this item
+  actions: string[] // Array of MeetingAction IDs
+
+  // Attendance for this item (if someone arrived/left during meeting)
+  presenters?: string[] // Who presented this item
+
+  // Metadata
+  status: 'draft' | 'reviewed' | 'approved' // Minute approval workflow
+  lastEditedBy?: string
+  lastEditedAt?: string
+  approvedBy?: string
+  approvedAt?: string
+
+  // AI processing
+  transcriptSegment?: {
+    startTime: string // Timestamp in recording
+    endTime: string // Timestamp in recording
+    transcriptText: string // Raw transcript for this item
+    confidenceScore?: number // AI confidence in extraction
+  }
+
+  createdAt: string
+  updatedAt: string
+}
+
+// Meeting transcript for AI processing
+export interface MeetingTranscript {
+  id: string
+  meetingId: string
+
+  // Recording information
+  recordingUrl?: string // Link to Teams/Zoom recording
+  recordingDuration?: number // Duration in seconds
+
+  // Transcript content
+  transcriptText: string // Full transcript
+  transcriptFormat: 'plain' | 'vtt' | 'srt' | 'json' // Format of transcript
+
+  // Timestamp-based segments
+  segments?: TranscriptSegment[]
+
+  // Speaker identification
+  speakers?: SpeakerInfo[]
+
+  // Processing metadata
+  uploadedBy: string
+  uploadedAt: string
+  processedAt?: string
+  processingStatus: 'pending' | 'processing' | 'completed' | 'failed'
+  processingError?: string
+
+  // AI extraction results
+  extractedMinutes?: {
+    agendaItemId: string
+    extractedDiscussion: string
+    confidenceScore: number
+    suggestedActions: string[]
+  }[]
+}
+
+export interface TranscriptSegment {
+  startTime: string // Timestamp (e.g., "00:15:30")
+  endTime: string // Timestamp (e.g., "00:18:45")
+  speaker?: string // Speaker name/ID
+  text: string // Transcript text for this segment
+}
+
+export interface SpeakerInfo {
+  speakerId: string
+  speakerName: string
+  email?: string
+  speakingDuration?: number // Total seconds spoken
+}
+
+// Complete meeting minutes document
+export interface MeetingMinutes {
+  id: string
+  meetingId: string
+
+  // Metadata
+  meetingTitle: string
+  committee: string
+  meetingDate: string
+  startTime: string
+  endTime: string
+  location?: string
+
+  // Attendance
+  attendees: AttendanceRecord[]
+  apologies: string[] // People who sent apologies
+  absent: string[] // People who were absent without apology
+
+  // Minutes content (from MinuteItems list)
+  minuteItems: string[] // Array of MinuteItem IDs
+
+  // Additional sections
+  additionalNotes?: string // General notes not tied to specific agenda items
+  nextMeetingDate?: string
+
+  // Document status
+  status: 'draft' | 'circulated' | 'approved' | 'published'
+  circulatedAt?: string
+  circulatedBy?: string
+  approvedAt?: string
+  approvedBy?: string
+
+  // PDF export
+  pdfUrl?: string // Link to exported PDF
+  pdfGeneratedAt?: string
+
+  createdAt: string
+  updatedAt: string
+  version: string // Version number for tracking changes
+}
+
+export interface AttendanceRecord {
+  userId: string
+  displayName: string
+  email: string
+  role?: string // Chair, Secretary, Member, Observer
+  status: 'present' | 'apologies' | 'absent'
+  arrivedAt?: string // If arrived late
+  leftAt?: string // If left early
+}

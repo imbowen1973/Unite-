@@ -11,6 +11,7 @@ export type GuestUserType =
   | 'industry-partner' // Industry/business partner
   | 'student-rep' // Student representative
   | 'external-reviewer' // External reviewer/auditor
+  | 'temporary-appellant' // Temporary access for appeal submission (auto-deleted after)
 
 /**
  * Guest user profile
@@ -50,10 +51,39 @@ export interface GuestUser {
   expertise?: string[]
   linkedIn?: string
 
+  // Appellant-specific (for temporary-appellant type)
+  appellantInfo?: AppellantInfo
+
   // Metadata
   createdAt: string
   updatedAt: string
   lastLoginAt?: string
+  accountDeletedAt?: string // When account was deleted (for appellants)
+}
+
+/**
+ * Appellant-specific information
+ */
+export interface AppellantInfo {
+  appealId: string // Links to the appeal case
+  appealType: 'academic' | 'disciplinary' | 'grade' | 'admission' | 'other'
+  appealReference: string // Reference number (e.g., "APP-2025-001")
+
+  // Access control
+  accessGrantedAt: string
+  accessExpiresAt: string // Automatic expiry (e.g., 14 days)
+
+  // Submission tracking
+  documentsUploaded: string[] // Document IDs
+  submittedAt?: string // When appeal was submitted
+  finalizedAt?: string // When appeal was finalized
+
+  // Auto-deletion
+  deletionScheduledAt?: string // When account deletion is scheduled
+  deletionStatus: 'pending' | 'scheduled' | 'completed'
+
+  // Retention (for audit)
+  retainAnonymizedData: boolean // Keep anonymous submission record
 }
 
 /**

@@ -1,38 +1,101 @@
-import { Metadata } from 'next'
+'use client'
 
-export const metadata: Metadata = {
-  title: 'Admin Dashboard | Unite',
-}
+// DMS Admin Tool - Comprehensive Administration Interface
+// Manages DMS libraries, meeting templates, committees, and system configuration
 
-export default function AdminDashboardPage() {
+import { useState } from 'react'
+import {
+  Database,
+  Calendar,
+  Users,
+  Settings,
+  FileText,
+  Shield,
+  Bell,
+  BarChart,
+} from 'lucide-react'
+
+import { DMSLibraryManager } from '@/components/admin/DMSLibraryManager'
+import { MeetingTemplateManager } from '@/components/admin/MeetingTemplateManager'
+import { CommitteeManager } from '@/components/admin/CommitteeManager'
+import { SystemSettings } from '@/components/admin/SystemSettings'
+
+type TabId = 'dms' | 'templates' | 'committees' | 'settings'
+
+export default function AdminPage() {
+  const [activeTab, setActiveTab] = useState<TabId>('dms')
+
+  const tabs = [
+    {
+      id: 'dms' as TabId,
+      label: 'DMS Libraries',
+      icon: Database,
+      description: 'Manage document libraries and site collections',
+    },
+    {
+      id: 'templates' as TabId,
+      label: 'Meeting Templates',
+      icon: Calendar,
+      description: 'Create and manage meeting templates',
+    },
+    {
+      id: 'committees' as TabId,
+      label: 'Committees & Groups',
+      icon: Users,
+      description: 'Configure committees and access groups',
+    },
+    {
+      id: 'settings' as TabId,
+      label: 'System Settings',
+      icon: Settings,
+      description: 'Platform configuration and preferences',
+    },
+  ]
+
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <h1 className="text-2xl font-bold text-gray-900 mb-6">Admin Dashboard</h1>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="border rounded-lg p-6 shadow-sm">
-                <h2 className="text-lg font-medium text-gray-900 mb-2">Dashboard Overview</h2>
-                <p className="text-gray-600 mb-4">This is a placeholder for the admin dashboard. The actual dashboard would include user management, library management, meeting management, document management, and document lifecycle tracking.</p>
-                <div className="bg-blue-50 p-4 rounded-md text-sm text-blue-800">
-                  <p>Dashboard components would be loaded here based on user role (admin or executive).</p>
-                </div>
-              </div>
-              <div className="border rounded-lg p-6 shadow-sm">
-                <h2 className="text-lg font-medium text-gray-900 mb-2">Key Features</h2>
-                <ul className="list-disc pl-5 space-y-2 text-gray-600">
-                  <li>User Management: Create, edit, and manage users and permissions</li>
-                  <li>Library Management: Create new SharePoint libraries for different purposes</li>
-                  <li>Meeting Management: Schedule meetings and track action items</li>
-                  <li>Document Management: Create and manage documents across the organization</li>
-                  <li>Document Lifecycle: Monitor documents needing approval, review, or rescinding</li>
-                  <li>Executive Tasks: View tasks assigned from Microsoft Planner</li>
-                </ul>
-              </div>
-            </div>
+    <div className="h-screen flex flex-col bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b shadow-sm">
+        <div className="px-8 py-4">
+          <h1 className="text-2xl font-bold text-gray-900">Unite Platform Administration</h1>
+          <p className="text-gray-600 mt-1">
+            Configure document management, meetings, committees, and system settings
+          </p>
+        </div>
+
+        {/* Tabs */}
+        <div className="px-8">
+          <div className="flex gap-1 border-b">
+            {tabs.map(tab => {
+              const Icon = tab.icon
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`
+                    flex items-center gap-2 px-6 py-3 border-b-2 transition-colors
+                    ${
+                      activeTab === tab.id
+                        ? 'border-blue-500 text-blue-600 bg-blue-50'
+                        : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                    }
+                  `}
+                >
+                  <Icon className="w-5 h-5" />
+                  <span className="font-medium">{tab.label}</span>
+                </button>
+              )
+            })}
           </div>
         </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-hidden">
+        {activeTab === 'dms' && <DMSLibraryManager />}
+        {activeTab === 'templates' && <MeetingTemplateManager />}
+        {activeTab === 'committees' && <CommitteeManager />}
+        {activeTab === 'settings' && <SystemSettings />}
       </div>
     </div>
   )

@@ -45,8 +45,19 @@ export interface AgendaItem {
   voteType?: 'simple-majority' | 'super-majority' | 'unanimous'
   role: 'information' | 'action' | 'decision' | 'voting' | 'discussion' | 'break' // Role-based categorization
   discussionOutcome?: string
+
+  // Strategy linking
+  strategyLinks?: StrategyLink[] // Links to strategy items this agenda item contributes to
+
   createdAt: string
   updatedAt: string
+}
+
+// Strategy link for agenda/minute items
+export interface StrategyLink {
+  strategyItemId: string
+  contributionType: 'initiate' | 'support' | 'related-to' | 'deliver-towards' | 'review' | 'monitor' | 'finalise' | 'report'
+  contributionDescription?: string
 }
 
 export interface MeetingAction {
@@ -161,6 +172,9 @@ export interface MinuteItem {
 
   // Attendance for this item (if someone arrived/left during meeting)
   presenters?: string[] // Who presented this item
+
+  // Strategy linking
+  strategyLinks?: StrategyLink[] // Links to strategy items this minute contributes to
 
   // Metadata
   status: 'draft' | 'reviewed' | 'approved' // Minute approval workflow

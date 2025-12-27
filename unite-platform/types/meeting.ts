@@ -24,16 +24,26 @@ export interface AgendaItem {
   meetingId: string
   title: string
   description: string
-  itemOrder: number // Position in the agenda
+
+  // Hierarchical ordering
+  itemOrder: number // Position in the agenda (e.g., 7, 8, 9)
+  parentItemId?: string // Link to parent item for sub-points
+  orderPath: string // Full path for sorting (e.g., "7", "7.1", "7.2", "7.2.1")
+  level: number // Depth level (0 = top level, 1 = first sub-item, etc.)
+
+  // Time management
+  startTime?: string // ISO timestamp - calculated from meeting start + previous items
+  timeAllocation: number // in minutes (duration)
+  endTime?: string // ISO timestamp - calculated as startTime + timeAllocation
+
   documentId?: string
   docStableId?: string
   presenter?: string
-  timeAllocation: number // in minutes
   status: 'pending' | 'in-progress' | 'discussed' | 'deferred' | 'completed'
   supportingDocuments: string[] // docStableIds of supporting documents
   voteRequired: 'none' | 'approval' | 'opinion'
   voteType?: 'simple-majority' | 'super-majority' | 'unanimous'
-  role: 'information' | 'action' | 'decision' | 'voting' | 'discussion' // Role-based categorization
+  role: 'information' | 'action' | 'decision' | 'voting' | 'discussion' | 'break' // Role-based categorization
   discussionOutcome?: string
   createdAt: string
   updatedAt: string
@@ -100,4 +110,21 @@ export interface VotingPattern {
   timestamp: string
 }
 
-export type AgendaItemRole = 'information' | 'action' | 'decision' | 'voting' | 'discussion';
+export type AgendaItemRole = 'information' | 'action' | 'decision' | 'voting' | 'discussion' | 'break';
+
+// Meeting configuration
+export interface MeetingConfiguration {
+  meetingId: string
+  startTime: string // ISO timestamp for when meeting starts
+  allowSubItems: boolean // Whether to enable hierarchical agenda items
+  autoCalculateTimes: boolean // Whether to auto-calculate start/end times
+  defaultBreakDuration: number // Default break duration in minutes
+}
+
+// Helper type for agenda reordering
+export interface AgendaReorderOperation {
+  itemId: string
+  newOrderPath: string
+  newItemOrder: number
+  affectedChildrenIds: string[] // Children that move with parent
+}
